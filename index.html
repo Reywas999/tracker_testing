@@ -9,6 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Tracker">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         :root {
@@ -46,7 +47,7 @@
         .metrics-container {
             display: flex;
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
         .card {
             background-color: var(--card-bg);
@@ -66,6 +67,15 @@
         }
         .income-text { color: var(--accent-green); }
         .expense-text { color: var(--accent-red); }
+
+        /* Chart container wrapper */
+        .chart-container {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
         /* Form styling matching iOS clean aesthetics */
         .form-group {
@@ -112,7 +122,7 @@
         }
         button.btn-block.btn-excel {
             background-color: #107c41; /* Excel Green */
-            margin-top: 20px;
+            margin-top: 5px;
         }
         /* Sticky Tab Navigation Bar at base */
         .tab-bar {
@@ -161,6 +171,10 @@
                 <div class="card-title">Month Income</div>
                 <div class="card-amount income-text" id="dash-income">$0.00</div>
             </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="financialChart"></canvas>
         </div>
         
         <button class="btn-block btn-excel" onclick="downloadExcelWorkbook()">📊 Download Excel Workbook (.xlsx)</button>
@@ -291,6 +305,8 @@
     </div>
 
     <script>
+        let myChart = null; // Holds the chart instance
+
         function setDefaultDates() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('exp-date').value = today;
@@ -305,7 +321,10 @@
             element.classList.add('active');
             
             document.getElementById('page-title').innerText = viewName.charAt(0).toUpperCase() + viewName.slice(1);
-            if(viewName === 'dashboard') calculateMetrics();
+            if(viewName === 'dashboard') {
+                calculateMetrics();
+                renderChart();
+            }
         }
 
         function toggleCustom(selectId, rowId) {
@@ -327,17 +346,116 @@
             const currentYear = new Date().getFullYear();
 
             const totalExp = data.expenses.filter(e => {
-                const d = new Date(e.date);
+                const d = new Date(e.date + 'T00:00:00');
                 return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
             }).reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
 
             const totalInc = data.income.filter(i => {
-                const d = new Date(i.date);
+                const d = new Date(i.date + 'T00:00:00');
                 return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
             }).reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
 
             document.getElementById('dash-expenses').innerText = `$${totalExp.toFixed(2)}`;
             document.getElementById('dash-income').innerText = `$${totalInc.toFixed(2)}`;
+        }
+
+        // Processing historical entries chronologically to build out trends
+        function renderChart() {
+            const data = getStorageData();
+            const monthlyData = {};
+
+            // Group Expenses by key format: YYYY-MM
+            data.expenses.forEach(e => {
+                if(!e.date) return;
+                const key = e.date.substring(0, 7); // "2026-07"
+                if(!monthlyData[key]) monthlyData[key] = { income: 0, expenses: 0 };
+                monthlyData[key].expenses += parseFloat(e.amount || 0);
+            });
+
+            // Group Income by key format: YYYY-MM
+            data.income.forEach(i => {
+                if(!i.date) return;
+                const key = i.date.substring(0, 7);
+                if(!monthlyData[key]) monthlyData[key] = { income: 0, expenses: 0 };
+                monthlyData[key].income += parseFloat(i.amount || 0);
+            });
+
+            // Sort timeline keys chronologically
+            const sortedKeys = Object.keys(monthlyData).sort();
+
+            const labels = [];
+            const incomeValues = [];
+            const expenseValues = [];
+            const netValues = [];
+
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            sortedKeys.forEach(key => {
+                const parts = key.split('-');
+                const year = parts[0];
+                const monthIdx = parseInt(parts[1], 10) - 1;
+                labels.push(`${monthNames[monthIdx]} ${year}`);
+
+                const inc = monthlyData[key].income;
+                const exp = monthlyData[key].expenses;
+                incomeValues.push(inc);
+                expenseValues.push(exp);
+                netValues.push(inc - exp);
+            });
+
+            // If a chart already exists, destroy it so it redraws with new clean numbers
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const ctx = document.getElementById('financialChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: incomeValues,
+                            borderColor: '#34c759', // Green
+                            backgroundColor: '#34c75922',
+                            tension: 0.2,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Expenses',
+                            data: expenseValues,
+                            borderColor: '#ff3b30', // Red
+                            backgroundColor: '#ff3b3022',
+                            tension: 0.2,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Net Income',
+                            data: netValues,
+                            borderColor: '#007aff', // Blue
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5], // Dotted line for Net distinction
+                            tension: 0.2,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return '$' + value; }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function saveExpense() {
@@ -399,11 +517,9 @@
             return `${parts[1]}/${parts[2]}/${parts[0]}`;
         };
 
-        // Multi-tab Excel file compilation logic using SheetJS
         function downloadExcelWorkbook() {
             const data = getStorageData();
             
-            // 1. Map Expenses into exact requested layout array
             const expensesRows = data.expenses.map(e => ({
                 'Date': formatDateStr(e.date),
                 'Location': e.location,
@@ -413,7 +529,6 @@
                 'Total Amount': e.amount
             }));
             
-            // 2. Map Income into exact requested layout array
             const incomeRows = data.income.map(i => ({
                 'Date': formatDateStr(i.date),
                 'Hours': i.hours,
@@ -425,23 +540,19 @@
                 'Taxes': i.taxes
             }));
 
-            // 3. Create a clean SheetJS workbook element container
             const workbook = XLSX.utils.book_new();
-            
-            // 4. Transform raw JSON arrays into Excel spreadsheet blocks
             const expensesSheet = XLSX.utils.json_to_sheet(expensesRows);
             const incomeSheet = XLSX.utils.json_to_sheet(incomeRows);
             
-            // 5. Append individual worksheets as separate tabs with matching labels
             XLSX.utils.book_append_sheet(workbook, expensesSheet, "Expenses");
             XLSX.utils.book_append_sheet(workbook, incomeSheet, "Income");
             
-            // 6. Trigger native device binary download handling
             XLSX.writeFile(workbook, "Financial_Tracker_Report.xlsx");
         }
 
         setDefaultDates();
         calculateMetrics();
+        renderChart(); // Render chart on baseline startup loads
     </script>
 </body>
 </html>
