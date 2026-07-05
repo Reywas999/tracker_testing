@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simple Tracker</title>
-    <!-- Makes the web app capable of running full screen like a native app on iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tracker">
+    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
     <style>
         :root {
             --bg-color: #f2f2f7;
@@ -108,12 +110,9 @@
             margin-top: 10px;
             cursor: pointer;
         }
-        button.btn-block.btn-expense {
-            background-color: #5856d6;
-            margin-bottom: 12px;
-        }
-        button.btn-block.btn-income {
-            background-color: #5ac8fa;
+        button.btn-block.btn-excel {
+            background-color: #107c41; /* Excel Green */
+            margin-top: 20px;
         }
         /* Sticky Tab Navigation Bar at base */
         .tab-bar {
@@ -152,7 +151,6 @@
 
     <div class="header" id="page-title">Dashboard</div>
 
-    <!-- 1. DASHBOARD VIEW -->
     <div id="dashboard-view" class="view-section active">
         <div class="metrics-container">
             <div class="card">
@@ -165,12 +163,9 @@
             </div>
         </div>
         
-        <!-- Updated to separate export actions -->
-        <button class="btn-block btn-expense" onclick="downloadExpensesCSV()">📥 Export Expenses (CSV)</button>
-        <button class="btn-block btn-income" onclick="downloadIncomeCSV()">📥 Export Income (CSV)</button>
+        <button class="btn-block btn-excel" onclick="downloadExcelWorkbook()">📊 Download Excel Workbook (.xlsx)</button>
     </div>
 
-    <!-- 2. EXPENSE FORM VIEW -->
     <div id="expense-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -220,7 +215,6 @@
         <button class="btn-block" onclick="saveExpense()">Save Expense</button>
     </div>
 
-    <!-- 3. INCOME FORM VIEW -->
     <div id="income-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -281,7 +275,6 @@
         <button class="btn-block" onclick="saveIncome()">Save Income</button>
     </div>
 
-    <!-- TAB NAVIGATION BAR -->
     <div class="tab-bar">
         <button class="tab-item active" onclick="switchView('dashboard', this)">
             <span class="tab-icon">📊</span>
@@ -298,14 +291,12 @@
     </div>
 
     <script>
-        // Set dates to today's date formatted for standard HTML input elements (YYYY-MM-DD)
         function setDefaultDates() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('exp-date').value = today;
             document.getElementById('inc-date').value = today;
         }
 
-        // View handling
         function switchView(viewName, element) {
             document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -313,19 +304,16 @@
             document.getElementById(`${viewName}-view`).classList.add('active');
             element.classList.add('active');
             
-            // Format top header title string based on active panel layout context
             document.getElementById('page-title').innerText = viewName.charAt(0).toUpperCase() + viewName.slice(1);
             if(viewName === 'dashboard') calculateMetrics();
         }
 
-        // Drop-down rule handling logic
         function toggleCustom(selectId, rowId) {
             const selectEl = document.getElementById(selectId);
             const rowEl = document.getElementById(rowId);
             rowEl.style.display = selectEl.value === 'Other' ? 'flex' : 'none';
         }
 
-        // Local Storage CRUD Logic
         function getStorageData() {
             return {
                 expenses: JSON.parse(localStorage.getItem('expenses')) || [],
@@ -335,7 +323,7 @@
 
         function calculateMetrics() {
             const data = getStorageData();
-            const currentMonth = new Date().getMonth(); // 0-11
+            const currentMonth = new Date().getMonth(); 
             const currentYear = new Date().getFullYear();
 
             const totalExp = data.expenses.filter(e => {
@@ -363,13 +351,12 @@
                 category: catSelect === 'Other' ? document.getElementById('exp-custom-category').value : catSelect,
                 items: document.getElementById('exp-items').value,
                 paymentMethod: paySelect === 'Other' ? document.getElementById('exp-custom-payment').value : paySelect,
-                amount: document.getElementById('exp-amount').value
+                amount: parseFloat(document.getElementById('exp-amount').value) || 0.0
             };
 
             data.expenses.push(entry);
             localStorage.setItem('expenses', JSON.stringify(data.expenses));
             
-            // Clear inputs
             document.getElementById('exp-location').value = '';
             document.getElementById('exp-items').value = '';
             document.getElementById('exp-amount').value = '';
@@ -385,8 +372,8 @@
 
             const entry = {
                 date: document.getElementById('inc-date').value,
-                hours: document.getElementById('inc-hours').value,
-                amount: document.getElementById('inc-amount').value,
+                hours: parseFloat(document.getElementById('inc-hours').value) || 0,
+                amount: parseFloat(document.getElementById('inc-amount').value) || 0.0,
                 category: catSelect === 'Other' ? document.getElementById('inc-custom-category').value : catSelect,
                 from: document.getElementById('inc-from').value,
                 info: document.getElementById('inc-info').value,
@@ -397,7 +384,6 @@
             data.income.push(entry);
             localStorage.setItem('income', JSON.stringify(data.income));
 
-            // Clear inputs
             document.getElementById('inc-hours').value = '';
             document.getElementById('inc-amount').value = '';
             document.getElementById('inc-custom-category').value = '';
@@ -407,49 +393,53 @@
             alert('Income saved locally!');
         }
 
-        // Custom clean date formatter helper for output formatting requirements
         const formatDateStr = (str) => {
             if(!str) return '';
-            const parts = str.split('-'); // YYYY-MM-DD
+            const parts = str.split('-'); 
             return `${parts[1]}/${parts[2]}/${parts[0]}`;
         };
 
-        // Separate Export for Expenses
-        function downloadExpensesCSV() {
+        // Multi-tab Excel file compilation logic using SheetJS
+        function downloadExcelWorkbook() {
             const data = getStorageData();
-            let csv = 'Date,Location,Category,Item(s),Payment Method,Total Amount\n';
             
-            data.expenses.forEach(e => {
-                csv += `${formatDateStr(e.date)},"${e.location}","${e.category}","${e.items}","${e.paymentMethod}",${e.amount}\n`;
-            });
-
-            triggerDownload(csv, 'Expenses_Report.csv');
-        }
-
-        // Separate Export for Income
-        function downloadIncomeCSV() {
-            const data = getStorageData();
-            let csv = 'Date,Hours,Amount,Category,From,Info,Type,Taxes\n';
+            // 1. Map Expenses into exact requested layout array
+            const expensesRows = data.expenses.map(e => ({
+                'Date': formatDateStr(e.date),
+                'Location': e.location,
+                'Category': e.category,
+                'Item(s)': e.items,
+                'Payment Method': e.paymentMethod,
+                'Total Amount': e.amount
+            }));
             
-            data.income.forEach(i => {
-                csv += `${formatDateStr(i.date)},${i.hours},${i.amount},"${i.category}","${i.from}","${i.info}","${i.type}","${i.taxes}"\n`;
-            });
+            // 2. Map Income into exact requested layout array
+            const incomeRows = data.income.map(i => ({
+                'Date': formatDateStr(i.date),
+                'Hours': i.hours,
+                'Amount': i.amount,
+                'Category': i.category,
+                'From': i.from,
+                'Info': i.info,
+                'Type': i.type,
+                'Taxes': i.taxes
+            }));
 
-            triggerDownload(csv, 'Income_Report.csv');
+            // 3. Create a clean SheetJS workbook element container
+            const workbook = XLSX.utils.book_new();
+            
+            // 4. Transform raw JSON arrays into Excel spreadsheet blocks
+            const expensesSheet = XLSX.utils.json_to_sheet(expensesRows);
+            const incomeSheet = XLSX.utils.json_to_sheet(incomeRows);
+            
+            // 5. Append individual worksheets as separate tabs with matching labels
+            XLSX.utils.book_append_sheet(workbook, expensesSheet, "Expenses");
+            XLSX.utils.book_append_sheet(workbook, incomeSheet, "Income");
+            
+            // 6. Trigger native device binary download handling
+            XLSX.writeFile(workbook, "Financial_Tracker_Report.xlsx");
         }
 
-        // Helper function to process download anchor actions
-        function triggerDownload(csvContent, fileName) {
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", fileName);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Initial launch configuration setup running on load sequences
         setDefaultDates();
         calculateMetrics();
     </script>
