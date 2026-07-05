@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simple Tracker</title>
+    <!-- Makes the web app capable of running full screen like a native app on iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tracker">
@@ -107,6 +108,13 @@
             margin-top: 10px;
             cursor: pointer;
         }
+        button.btn-block.btn-expense {
+            background-color: #5856d6;
+            margin-bottom: 12px;
+        }
+        button.btn-block.btn-income {
+            background-color: #5ac8fa;
+        }
         /* Sticky Tab Navigation Bar at base */
         .tab-bar {
             position: fixed;
@@ -144,6 +152,7 @@
 
     <div class="header" id="page-title">Dashboard</div>
 
+    <!-- 1. DASHBOARD VIEW -->
     <div id="dashboard-view" class="view-section active">
         <div class="metrics-container">
             <div class="card">
@@ -155,9 +164,13 @@
                 <div class="card-amount income-text" id="dash-income">$0.00</div>
             </div>
         </div>
-        <button class="btn-block" onclick="downloadCSV()">Download CSV Report</button>
+        
+        <!-- Updated to separate export actions -->
+        <button class="btn-block btn-expense" onclick="downloadExpensesCSV()">📥 Export Expenses (CSV)</button>
+        <button class="btn-block btn-income" onclick="downloadIncomeCSV()">📥 Export Income (CSV)</button>
     </div>
 
+    <!-- 2. EXPENSE FORM VIEW -->
     <div id="expense-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -207,6 +220,7 @@
         <button class="btn-block" onclick="saveExpense()">Save Expense</button>
     </div>
 
+    <!-- 3. INCOME FORM VIEW -->
     <div id="income-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -267,6 +281,7 @@
         <button class="btn-block" onclick="saveIncome()">Save Income</button>
     </div>
 
+    <!-- TAB NAVIGATION BAR -->
     <div class="tab-bar">
         <button class="tab-item active" onclick="switchView('dashboard', this)">
             <span class="tab-icon">📊</span>
@@ -392,31 +407,43 @@
             alert('Income saved locally!');
         }
 
-        // Text File Generation & Download
-        function downloadCSV() {
-            const data = getStorageData();
-            
-            // Custom clean date formatter helper for output formatting requirements
-            const formatDateStr = (str) => {
-                if(!str) return '';
-                const parts = str.split('-'); // YYYY-MM-DD
-                return `${parts[1]}/${parts[2]}/${parts[0]}`;
-            };
+        // Custom clean date formatter helper for output formatting requirements
+        const formatDateStr = (str) => {
+            if(!str) return '';
+            const parts = str.split('-'); // YYYY-MM-DD
+            return `${parts[1]}/${parts[2]}/${parts[0]}`;
+        };
 
-            let csv = 'Type,Date,Amount,Category,Location/From,Details,Payment/Tax Info\n';
+        // Separate Export for Expenses
+        function downloadExpensesCSV() {
+            const data = getStorageData();
+            let csv = 'Date,Location,Category,Item(s),Payment Method,Total Amount\n';
             
             data.expenses.forEach(e => {
-                csv += `Expense,${formatDateStr(e.date)},${e.amount},"${e.category}","${e.location}","${e.items}","${e.paymentMethod}"\n`;
-            });
-            
-            data.income.forEach(i => {
-                csv += `Income,${formatDateStr(i.date)},${i.amount},"${i.category}","${i.from}","${i.info}","Hours: ${i.hours} | Tax: ${i.taxes}"\n`;
+                csv += `${formatDateStr(e.date)},"${e.location}","${e.category}","${e.items}","${e.paymentMethod}",${e.amount}\n`;
             });
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            triggerDownload(csv, 'Expenses_Report.csv');
+        }
+
+        // Separate Export for Income
+        function downloadIncomeCSV() {
+            const data = getStorageData();
+            let csv = 'Date,Hours,Amount,Category,From,Info,Type,Taxes\n';
+            
+            data.income.forEach(i => {
+                csv += `${formatDateStr(i.date)},${i.hours},${i.amount},"${i.category}","${i.from}","${i.info}","${i.type}","${i.taxes}"\n`;
+            });
+
+            triggerDownload(csv, 'Income_Report.csv');
+        }
+
+        // Helper function to process download anchor actions
+        function triggerDownload(csvContent, fileName) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", "Financial_Report.csv");
+            link.setAttribute("download", fileName);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -428,4 +455,3 @@
     </script>
 </body>
 </html>
-   
