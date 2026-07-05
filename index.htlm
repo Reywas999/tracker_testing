@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simple Tracker</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Tracker">
+    <style>
+        :root {
+            --bg-color: #f2f2f7;
+            --card-bg: #ffffff;
+            --text-color: #000000;
+            --accent-blue: #007aff;
+            --accent-green: #34c759;
+            --accent-red: #ff3b30;
+            --border-color: #c6c6c8;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px;
+        }
+        .header {
+            background-color: var(--card-bg);
+            padding: 20px 16px;
+            font-size: 28px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .view-section {
+            display: none;
+            padding: 16px;
+        }
+        .view-section.active {
+            display: block;
+        }
+        /* Dashboard Layout */
+        .metrics-container {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            flex: 1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card-title {
+            font-size: 14px;
+            color: #8e8e93;
+            margin-bottom: 8px;
+        }
+        .card-amount {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .income-text { color: var(--accent-green); }
+        .expense-text { color: var(--accent-red); }
+
+        /* Form styling matching iOS clean aesthetics */
+        .form-group {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 4px 16px;
+            margin-bottom: 16px;
+        }
+        .form-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e5ea;
+        }
+        .form-row:last-child {
+            border-bottom: none;
+        }
+        .form-row label {
+            width: 130px;
+            font-size: 16px;
+        }
+        .form-row input, .form-row select {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            background: transparent;
+            text-align: right;
+        }
+        .conditional-field {
+            display: none;
+        }
+        button.btn-block {
+            width: 100%;
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 17px;
+            font-weight: 600;
+            border-radius: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        /* Sticky Tab Navigation Bar at base */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 65px;
+            background-color: #f9f9f9;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 11px;
+            color: #8e8e93;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+        .tab-item.active {
+            color: var(--accent-blue);
+        }
+        .tab-icon {
+            font-size: 24px;
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header" id="page-title">Dashboard</div>
+
+    <div id="dashboard-view" class="view-section active">
+        <div class="metrics-container">
+            <div class="card">
+                <div class="card-title">Month Expenses</div>
+                <div class="card-amount expense-text" id="dash-expenses">$0.00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Month Income</div>
+                <div class="card-amount income-text" id="dash-income">$0.00</div>
+            </div>
+        </div>
+        <button class="btn-block" onclick="downloadCSV()">Download CSV Report</button>
+    </div>
+
+    <div id="expense-view" class="view-section">
+        <div class="form-group">
+            <div class="form-row">
+                <label>Date</label>
+                <input type="date" id="exp-date">
+            </div>
+            <div class="form-row">
+                <label>Location</label>
+                <input type="text" id="exp-location" placeholder="Required">
+            </div>
+            <div class="form-row">
+                <label>Category</label>
+                <select id="exp-category" onchange="toggleCustom('exp-category', 'exp-custom-cat-row')">
+                    <option value="Food">Food</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Gas">Gas</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-row conditional-field" id="exp-custom-cat-row">
+                <label>Custom Category</label>
+                <input type="text" id="exp-custom-category" placeholder="Type here">
+            </div>
+            <div class="form-row">
+                <label>Item(s)</label>
+                <input type="text" id="exp-items" placeholder="Details">
+            </div>
+            <div class="form-row">
+                <label>Payment Method</label>
+                <select id="exp-payment" onchange="toggleCustom('exp-payment', 'exp-custom-pay-row')">
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Debit Card">Debit Card</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-row conditional-field" id="exp-custom-pay-row">
+                <label>Custom Payment</label>
+                <input type="text" id="exp-custom-payment" placeholder="Type here">
+            </div>
+            <div class="form-row">
+                <label>Total Amount</label>
+                <input type="number" step="0.01" id="exp-amount" placeholder="0.00">
+            </div>
+        </div>
+        <button class="btn-block" onclick="saveExpense()">Save Expense</button>
+    </div>
+
+    <div id="income-view" class="view-section">
+        <div class="form-group">
+            <div class="form-row">
+                <label>Date</label>
+                <input type="date" id="inc-date">
+            </div>
+            <div class="form-row">
+                <label>Hours</label>
+                <input type="number" step="0.1" id="inc-hours" placeholder="0">
+            </div>
+            <div class="form-row">
+                <label>Amount</label>
+                <input type="number" step="0.01" id="inc-amount" placeholder="0.00">
+            </div>
+            <div class="form-row">
+                <label>Category</label>
+                <select id="inc-category" onchange="toggleCustom('inc-category', 'inc-custom-cat-row')">
+                    <option value="Wages">Wages</option>
+                    <option value="Freelance">Freelance</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-row conditional-field" id="inc-custom-cat-row">
+                <label>Custom Category</label>
+                <input type="text" id="inc-custom-category" placeholder="Type here">
+            </div>
+            <div class="form-row">
+                <label>From</label>
+                <input type="text" id="inc-from" placeholder="Source">
+            </div>
+            <div class="form-row">
+                <label>Info</label>
+                <input type="text" id="inc-info" placeholder="Notes">
+            </div>
+            <div class="form-row">
+                <label>Type</label>
+                <select id="inc-type" onchange="toggleCustom('inc-type', 'inc-custom-type-row')">
+                    <option value="Direct Deposit">Direct Deposit</option>
+                    <option value="Check">Check</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-row conditional-field" id="inc-custom-type-row">
+                <label>Custom Type</label>
+                <input type="text" id="inc-custom-type" placeholder="Type here">
+            </div>
+            <div class="form-row">
+                <label>Taxes</label>
+                <select id="inc-taxes">
+                    <option value="Pre-tax">Pre-tax</option>
+                    <option value="Post-tax">Post-tax</option>
+                    <option value="Exempt">Exempt</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn-block" onclick="saveIncome()">Save Income</button>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab-item active" onclick="switchView('dashboard', this)">
+            <span class="tab-icon">📊</span>
+            <span>Dashboard</span>
+        </button>
+        <button class="tab-item" onclick="switchView('expense', this)">
+            <span class="tab-icon">📉</span>
+            <span>+ Expense</span>
+        </button>
+        <button class="tab-item" onclick="switchView('income', this)">
+            <span class="tab-icon">📈</span>
+            <span>+ Income</span>
+        </button>
+    </div>
+
+    <script>
+        // Set dates to today's date formatted for standard HTML input elements (YYYY-MM-DD)
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('exp-date').value = today;
+            document.getElementById('inc-date').value = today;
+        }
+
+        // View handling
+        function switchView(viewName, element) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById(`${viewName}-view`).classList.add('active');
+            element.classList.add('active');
+            
+            // Format top header title string based on active panel layout context
+            document.getElementById('page-title').innerText = viewName.charAt(0).toUpperCase() + viewName.slice(1);
+            if(viewName === 'dashboard') calculateMetrics();
+        }
+
+        // Drop-down rule handling logic
+        function toggleCustom(selectId, rowId) {
+            const selectEl = document.getElementById(selectId);
+            const rowEl = document.getElementById(rowId);
+            rowEl.style.display = selectEl.value === 'Other' ? 'flex' : 'none';
+        }
+
+        // Local Storage CRUD Logic
+        function getStorageData() {
+            return {
+                expenses: JSON.parse(localStorage.getItem('expenses')) || [],
+                income: JSON.parse(localStorage.getItem('income')) || []
+            };
+        }
+
+        function calculateMetrics() {
+            const data = getStorageData();
+            const currentMonth = new Date().getMonth(); // 0-11
+            const currentYear = new Date().getFullYear();
+
+            const totalExp = data.expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            }).reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+
+            const totalInc = data.income.filter(i => {
+                const d = new Date(i.date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            }).reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
+
+            document.getElementById('dash-expenses').innerText = `$${totalExp.toFixed(2)}`;
+            document.getElementById('dash-income').innerText = `$${totalInc.toFixed(2)}`;
+        }
+
+        function saveExpense() {
+            const data = getStorageData();
+            const catSelect = document.getElementById('exp-category').value;
+            const paySelect = document.getElementById('exp-payment').value;
+
+            const entry = {
+                date: document.getElementById('exp-date').value,
+                location: document.getElementById('exp-location').value,
+                category: catSelect === 'Other' ? document.getElementById('exp-custom-category').value : catSelect,
+                items: document.getElementById('exp-items').value,
+                paymentMethod: paySelect === 'Other' ? document.getElementById('exp-custom-payment').value : paySelect,
+                amount: document.getElementById('exp-amount').value
+            };
+
+            data.expenses.push(entry);
+            localStorage.setItem('expenses', JSON.stringify(data.expenses));
+            
+            // Clear inputs
+            document.getElementById('exp-location').value = '';
+            document.getElementById('exp-items').value = '';
+            document.getElementById('exp-amount').value = '';
+            document.getElementById('exp-custom-category').value = '';
+            document.getElementById('exp-custom-payment').value = '';
+            alert('Expense saved locally!');
+        }
+
+        function saveIncome() {
+            const data = getStorageData();
+            const catSelect = document.getElementById('inc-category').value;
+            const typeSelect = document.getElementById('inc-type').value;
+
+            const entry = {
+                date: document.getElementById('inc-date').value,
+                hours: document.getElementById('inc-hours').value,
+                amount: document.getElementById('inc-amount').value,
+                category: catSelect === 'Other' ? document.getElementById('inc-custom-category').value : catSelect,
+                from: document.getElementById('inc-from').value,
+                info: document.getElementById('inc-info').value,
+                type: typeSelect === 'Other' ? document.getElementById('inc-custom-type').value : typeSelect,
+                taxes: document.getElementById('inc-taxes').value
+            };
+
+            data.income.push(entry);
+            localStorage.setItem('income', JSON.stringify(data.income));
+
+            // Clear inputs
+            document.getElementById('inc-hours').value = '';
+            document.getElementById('inc-amount').value = '';
+            document.getElementById('inc-custom-category').value = '';
+            document.getElementById('inc-from').value = '';
+            document.getElementById('inc-info').value = '';
+            document.getElementById('inc-custom-type').value = '';
+            alert('Income saved locally!');
+        }
+
+        // Text File Generation & Download
+        function downloadCSV() {
+            const data = getStorageData();
+            
+            // Custom clean date formatter helper for output formatting requirements
+            const formatDateStr = (str) => {
+                if(!str) return '';
+                const parts = str.split('-'); // YYYY-MM-DD
+                return `${parts[1]}/${parts[2]}/${parts[0]}`;
+            };
+
+            let csv = 'Type,Date,Amount,Category,Location/From,Details,Payment/Tax Info\n';
+            
+            data.expenses.forEach(e => {
+                csv += `Expense,${formatDateStr(e.date)},${e.amount},"${e.category}","${e.location}","${e.items}","${e.paymentMethod}"\n`;
+            });
+            
+            data.income.forEach(i => {
+                csv += `Income,${formatDateStr(i.date)},${i.amount},"${i.category}","${i.from}","${i.info}","Hours: ${i.hours} | Tax: ${i.taxes}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "Financial_Report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Initial launch configuration setup running on load sequences
+        setDefaultDates();
+        calculateMetrics();
+    </script>
+</body>
+</html>
