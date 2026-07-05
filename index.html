@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simple Tracker</title>
+    <!-- Makes the web app capable of running full screen like a native app on iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tracker">
     
     <link rel="apple-touch-icon" href="logo.png">
     
+    <!-- External Libraries for Excel and Charting -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -161,6 +163,7 @@
 
     <div class="header" id="page-title">Dashboard</div>
 
+    <!-- 1. DASHBOARD VIEW -->
     <div id="dashboard-view" class="view-section active">
         <div class="metrics-container">
             <div class="card">
@@ -180,6 +183,7 @@
         <button class="btn-block btn-excel" onclick="downloadExcelWorkbook()">📊 Download Excel Workbook (.xlsx)</button>
     </div>
 
+    <!-- 2. EXPENSE FORM VIEW -->
     <div id="expense-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -193,7 +197,8 @@
             <div class="form-row">
                 <label>Category</label>
                 <select id="exp-category" onchange="toggleCustom('exp-category', 'exp-custom-cat-row')">
-                    </select>
+                    <!-- Loaded dynamically via script -->
+                </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-cat-row">
                 <label>Custom Category</label>
@@ -206,7 +211,8 @@
             <div class="form-row">
                 <label>Payment Method</label>
                 <select id="exp-payment" onchange="toggleCustom('exp-payment', 'exp-custom-pay-row')">
-                    </select>
+                    <!-- Loaded dynamically via script -->
+                </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-pay-row">
                 <label>Custom Payment</label>
@@ -220,6 +226,7 @@
         <button class="btn-block" onclick="saveExpense()">Save Expense</button>
     </div>
 
+    <!-- 3. INCOME FORM VIEW -->
     <div id="income-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -237,7 +244,8 @@
             <div class="form-row">
                 <label>Category</label>
                 <select id="inc-category" onchange="handleIncomeCategoryChange()">
-                    </select>
+                    <!-- Loaded dynamically via script -->
+                </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-cat-row">
                 <label>Custom Category</label>
@@ -254,7 +262,8 @@
             <div class="form-row">
                 <label>Type</label>
                 <select id="inc-type" onchange="toggleCustom('inc-type', 'inc-custom-type-row')">
-                    </select>
+                    <!-- Loaded dynamically via script -->
+                </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-type-row">
                 <label>Custom Type</label>
@@ -272,6 +281,7 @@
         <button class="btn-block" onclick="saveIncome()">Save Income</button>
     </div>
 
+    <!-- TAB NAVIGATION BAR -->
     <div class="tab-bar">
         <button class="tab-item active" onclick="switchView('dashboard', this)">
             <span class="tab-icon">📊</span>
@@ -297,20 +307,26 @@
         const baseIncomeCategories = ['Art', 'Art Commission', 'Construction', 'Construction Commissions', 'Education', 'Nursing', 'Product Testing', 'Reimbursement'];
         const baseIncomeTypes = ['Apple Cash', 'Cash', 'Check', 'Direct Deposit', 'Etsy Payout', 'Gusto', 'Venmo', 'Zelle'];
 
+        // Forces date initialization to precisely read Pacific Standard Time / Pacific Daylight Time
         function setDefaultDates() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('exp-date').value = today;
-            document.getElementById('inc-date').value = today;
+            const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
+            const formatter = new Intl.DateTimeFormat('en-US', options);
+            const [{ value: month }, , { value: day }, , { value: year }] = formatter.formatToParts(new Date());
+            
+            // Reassembles into the HTML-required YYYY-MM-DD input field layout template
+            const localFormattedDate = `${year}-${month}-${day}`;
+            
+            document.getElementById('exp-date').value = localFormattedDate;
+            document.getElementById('inc-date').value = localFormattedDate;
         }
 
         // Helper function to build dynamic dropdown list sorted by usage frequency
         function populateDropdown(elementId, baseList, historicalField, storageKey) {
             const selectEl = document.getElementById(elementId);
-            selectEl.innerHTML = ''; // Clear out old elements
+            selectEl.innerHTML = ''; 
 
             const data = JSON.parse(localStorage.getItem(storageKey)) || [];
             
-            // Generate frequencies count profile map
             const frequencies = {};
             baseList.forEach(item => frequencies[item] = 0);
             
@@ -321,7 +337,6 @@
                 }
             });
 
-            // Sort base options array by active frequency tallies, falling back to alphabetically matching criteria
             const sortedOptions = [...baseList].sort((a, b) => {
                 if (frequencies[b] !== frequencies[a]) {
                     return frequencies[b] - frequencies[a];
@@ -329,7 +344,6 @@
                 return a.localeCompare(b);
             });
 
-            // Append organized list elements adding the tracking placeholder "Other" variant baseline context safely
             sortedOptions.forEach(opt => {
                 const el = document.createElement('option');
                 el.value = opt;
@@ -350,7 +364,6 @@
             populateDropdown('inc-type', baseIncomeTypes, 'type', 'income');
         }
 
-        // Reimbursement unique autocomplete logic trigger routines
         function handleIncomeCategoryChange() {
             const catSelect = document.getElementById('inc-category').value;
             toggleCustom('inc-category', 'inc-custom-cat-row');
@@ -373,7 +386,6 @@
                 renderChart();
             } else {
                 populateAllDropdowns();
-                // Ensure custom row checks get executed on view swap
                 toggleCustom('exp-category', 'exp-custom-cat-row');
                 toggleCustom('exp-payment', 'exp-custom-pay-row');
                 handleIncomeCategoryChange();
@@ -398,17 +410,22 @@
 
         function calculateMetrics() {
             const data = getStorageData();
-            const currentMonth = new Date().getMonth(); 
-            const currentYear = new Date().getFullYear();
+            
+            // Metric filters need local time comparison matching
+            const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric' };
+            const formatter = new Intl.DateTimeFormat('en-US', options);
+            const [{ value: currentMonth }, , { value: currentYear }] = formatter.formatToParts(new Date());
 
             const totalExp = data.expenses.filter(e => {
-                const d = new Date(e.date + 'T00:00:00');
-                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                if(!e.date) return false;
+                const parts = e.date.split('-');
+                return parseInt(parts[1], 10) === parseInt(currentMonth, 10) && parseInt(parts[0], 10) === parseInt(currentYear, 10);
             }).reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
 
             const totalInc = data.income.filter(i => {
-                const d = new Date(i.date + 'T00:00:00');
-                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                if(!i.date) return false;
+                const parts = i.date.split('-');
+                return parseInt(parts[1], 10) === parseInt(currentMonth, 10) && parseInt(parts[0], 10) === parseInt(currentYear, 10);
             }).reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
 
             document.getElementById('dash-expenses').innerText = `$${totalExp.toFixed(2)}`;
@@ -529,6 +546,7 @@
             document.getElementById('exp-amount').value = '';
             document.getElementById('exp-custom-category').value = '';
             document.getElementById('exp-custom-payment').value = '';
+            setDefaultDates(); // Reset local dates cleanly
             alert('Expense saved locally!');
         }
 
@@ -557,6 +575,7 @@
             document.getElementById('inc-from').value = '';
             document.getElementById('inc-info').value = '';
             document.getElementById('inc-custom-type').value = '';
+            setDefaultDates(); // Reset local dates cleanly
             alert('Income saved locally!');
         }
 
