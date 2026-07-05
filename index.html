@@ -8,6 +8,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tracker">
     
+    <link rel="apple-touch-icon" href="logo.png">
+    
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -68,7 +70,6 @@
         .income-text { color: var(--accent-green); }
         .expense-text { color: var(--accent-red); }
 
-        /* Chart container wrapper */
         .chart-container {
             background-color: var(--card-bg);
             border-radius: 12px;
@@ -121,10 +122,9 @@
             cursor: pointer;
         }
         button.btn-block.btn-excel {
-            background-color: #107c41; /* Excel Green */
+            background-color: #107c41;
             margin-top: 5px;
         }
-        /* Sticky Tab Navigation Bar at base */
         .tab-bar {
             position: fixed;
             bottom: 0;
@@ -193,12 +193,7 @@
             <div class="form-row">
                 <label>Category</label>
                 <select id="exp-category" onchange="toggleCustom('exp-category', 'exp-custom-cat-row')">
-                    <option value="Food">Food</option>
-                    <option value="Utilities">Utilities</option>
-                    <option value="Gas">Gas</option>
-                    <option value="Entertainment">Entertainment</option>
-                    <option value="Other">Other</option>
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-cat-row">
                 <label>Custom Category</label>
@@ -211,11 +206,7 @@
             <div class="form-row">
                 <label>Payment Method</label>
                 <select id="exp-payment" onchange="toggleCustom('exp-payment', 'exp-custom-pay-row')">
-                    <option value="Credit Card">Credit Card</option>
-                    <option value="Debit Card">Debit Card</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Other">Other</option>
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-pay-row">
                 <label>Custom Payment</label>
@@ -245,12 +236,8 @@
             </div>
             <div class="form-row">
                 <label>Category</label>
-                <select id="inc-category" onchange="toggleCustom('inc-category', 'inc-custom-cat-row')">
-                    <option value="Wages">Wages</option>
-                    <option value="Freelance">Freelance</option>
-                    <option value="Investment">Investment</option>
-                    <option value="Other">Other</option>
-                </select>
+                <select id="inc-category" onchange="handleIncomeCategoryChange()">
+                    </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-cat-row">
                 <label>Custom Category</label>
@@ -267,11 +254,7 @@
             <div class="form-row">
                 <label>Type</label>
                 <select id="inc-type" onchange="toggleCustom('inc-type', 'inc-custom-type-row')">
-                    <option value="Direct Deposit">Direct Deposit</option>
-                    <option value="Check">Check</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Other">Other</option>
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-type-row">
                 <label>Custom Type</label>
@@ -305,12 +288,76 @@
     </div>
 
     <script>
-        let myChart = null; // Holds the chart instance
+        let myChart = null;
+
+        // Cleaned Master Baseline Lists
+        const baseExpenseCategories = ['Automotive', 'Dining Out', 'Entertainment', 'Gas', 'Gardening', 'Gift', 'Groceries', 'Hobby', 'Health & Wellness', 'Home Renovation', 'Household', 'Insurance', 'Mortgage', 'Pets', 'Subscriptions', 'Tools', 'Travel', 'Work'];
+        const baseExpensePayments = ['ACH', 'Apple Cash', 'Cash', 'Chase Credit Card', 'Chase Debit Card', 'Check', 'Direct Debit', 'Discover Credit Card', 'PayPal', 'Robinhood Credit Card', 'Robinhood Savings Account ACH', 'Venmo', 'Zelle'];
+        
+        const baseIncomeCategories = ['Art', 'Art Commission', 'Construction', 'Construction Commissions', 'Education', 'Nursing', 'Product Testing', 'Reimbursement'];
+        const baseIncomeTypes = ['Apple Cash', 'Cash', 'Check', 'Direct Deposit', 'Etsy Payout', 'Gusto', 'Venmo', 'Zelle'];
 
         function setDefaultDates() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('exp-date').value = today;
             document.getElementById('inc-date').value = today;
+        }
+
+        // Helper function to build dynamic dropdown list sorted by usage frequency
+        function populateDropdown(elementId, baseList, historicalField, storageKey) {
+            const selectEl = document.getElementById(elementId);
+            selectEl.innerHTML = ''; // Clear out old elements
+
+            const data = JSON.parse(localStorage.getItem(storageKey)) || [];
+            
+            // Generate frequencies count profile map
+            const frequencies = {};
+            baseList.forEach(item => frequencies[item] = 0);
+            
+            data.forEach(entry => {
+                const val = entry[historicalField];
+                if (val && frequencies[val] !== undefined) {
+                    frequencies[val]++;
+                }
+            });
+
+            // Sort base options array by active frequency tallies, falling back to alphabetically matching criteria
+            const sortedOptions = [...baseList].sort((a, b) => {
+                if (frequencies[b] !== frequencies[a]) {
+                    return frequencies[b] - frequencies[a];
+                }
+                return a.localeCompare(b);
+            });
+
+            // Append organized list elements adding the tracking placeholder "Other" variant baseline context safely
+            sortedOptions.forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt;
+                el.textContent = opt;
+                selectEl.appendChild(el);
+            });
+
+            const otherEl = document.createElement('option');
+            otherEl.value = 'Other';
+            otherEl.textContent = 'Other';
+            selectEl.appendChild(otherEl);
+        }
+
+        function populateAllDropdowns() {
+            populateDropdown('exp-category', baseExpenseCategories, 'category', 'expenses');
+            populateDropdown('exp-payment', baseExpensePayments, 'paymentMethod', 'expenses');
+            populateDropdown('inc-category', baseIncomeCategories, 'category', 'income');
+            populateDropdown('inc-type', baseIncomeTypes, 'type', 'income');
+        }
+
+        // Reimbursement unique autocomplete logic trigger routines
+        function handleIncomeCategoryChange() {
+            const catSelect = document.getElementById('inc-category').value;
+            toggleCustom('inc-category', 'inc-custom-cat-row');
+            
+            if (catSelect === 'Reimbursement') {
+                document.getElementById('inc-hours').value = '999';
+            }
         }
 
         function switchView(viewName, element) {
@@ -324,13 +371,22 @@
             if(viewName === 'dashboard') {
                 calculateMetrics();
                 renderChart();
+            } else {
+                populateAllDropdowns();
+                // Ensure custom row checks get executed on view swap
+                toggleCustom('exp-category', 'exp-custom-cat-row');
+                toggleCustom('exp-payment', 'exp-custom-pay-row');
+                handleIncomeCategoryChange();
+                toggleCustom('inc-type', 'inc-custom-type-row');
             }
         }
 
         function toggleCustom(selectId, rowId) {
             const selectEl = document.getElementById(selectId);
             const rowEl = document.getElementById(rowId);
-            rowEl.style.display = selectEl.value === 'Other' ? 'flex' : 'none';
+            if(selectEl && rowEl) {
+                rowEl.style.display = selectEl.value === 'Other' ? 'flex' : 'none';
+            }
         }
 
         function getStorageData() {
@@ -359,20 +415,17 @@
             document.getElementById('dash-income').innerText = `$${totalInc.toFixed(2)}`;
         }
 
-        // Processing historical entries chronologically to build out trends
         function renderChart() {
             const data = getStorageData();
             const monthlyData = {};
 
-            // Group Expenses by key format: YYYY-MM
             data.expenses.forEach(e => {
                 if(!e.date) return;
-                const key = e.date.substring(0, 7); // "2026-07"
+                const key = e.date.substring(0, 7); 
                 if(!monthlyData[key]) monthlyData[key] = { income: 0, expenses: 0 };
                 monthlyData[key].expenses += parseFloat(e.amount || 0);
             });
 
-            // Group Income by key format: YYYY-MM
             data.income.forEach(i => {
                 if(!i.date) return;
                 const key = i.date.substring(0, 7);
@@ -380,14 +433,11 @@
                 monthlyData[key].income += parseFloat(i.amount || 0);
             });
 
-            // Sort timeline keys chronologically
             const sortedKeys = Object.keys(monthlyData).sort();
-
             const labels = [];
             const incomeValues = [];
             const expenseValues = [];
             const netValues = [];
-
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
             sortedKeys.forEach(key => {
@@ -403,7 +453,6 @@
                 netValues.push(inc - exp);
             });
 
-            // If a chart already exists, destroy it so it redraws with new clean numbers
             if (myChart) {
                 myChart.destroy();
             }
@@ -417,7 +466,7 @@
                         {
                             label: 'Income',
                             data: incomeValues,
-                            borderColor: '#34c759', // Green
+                            borderColor: '#34c759',
                             backgroundColor: '#34c75922',
                             tension: 0.2,
                             borderWidth: 3
@@ -425,7 +474,7 @@
                         {
                             label: 'Expenses',
                             data: expenseValues,
-                            borderColor: '#ff3b30', // Red
+                            borderColor: '#ff3b30',
                             backgroundColor: '#ff3b3022',
                             tension: 0.2,
                             borderWidth: 3
@@ -433,9 +482,9 @@
                         {
                             label: 'Net Income',
                             data: netValues,
-                            borderColor: '#007aff', // Blue
+                            borderColor: '#007aff',
                             backgroundColor: 'transparent',
-                            borderDash: [5, 5], // Dotted line for Net distinction
+                            borderDash: [5, 5],
                             tension: 0.2,
                             borderWidth: 2
                         }
@@ -552,7 +601,7 @@
 
         setDefaultDates();
         calculateMetrics();
-        renderChart(); // Render chart on baseline startup loads
+        renderChart();
     </script>
 </body>
 </html>
