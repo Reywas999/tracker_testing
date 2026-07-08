@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simple Tracker</title>
-    <!-- Makes the web app capable of running full screen like a native app on iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tracker">
     
     <link rel="apple-touch-icon" href="logo.png">
     
-    <!-- External Libraries for Excel and Charting -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -78,6 +76,117 @@
             padding: 16px;
             margin-bottom: 16px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* History Table Styling */
+        .history-container {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .history-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .history-toggle {
+            font-size: 14px;
+            color: var(--accent-blue);
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+        }
+        .history-table th {
+            text-align: left;
+            color: #8e8e93;
+            font-weight: 500;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .history-table td {
+            padding: 12px 0;
+            border-bottom: 1px solid #f2f2f7;
+        }
+        .history-table tr:last-child td {
+            border-bottom: none;
+        }
+        .history-table tr:active {
+            background-color: #f2f2f7; /* Gives row click feedback */
+        }
+        .text-right {
+            text-align: right;
+        }
+
+        /* Details Modal Overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.4);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-end; /* Slides up like native iOS sheet */
+        }
+        .modal-content {
+            background-color: var(--card-bg);
+            width: 100%;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            padding: 20px;
+            box-sizing: border-box;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .modal-close {
+            font-size: 16px;
+            color: var(--accent-blue);
+            background: none;
+            border: none;
+            font-weight: 600;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f2f2f7;
+            font-size: 16px;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            color: #8e8e93;
+        }
+        .detail-value {
+            font-weight: 500;
+            text-align: right;
+            max-width: 60%;
         }
 
         /* Form styling matching iOS clean aesthetics */
@@ -163,7 +272,6 @@
 
     <div class="header" id="page-title">Dashboard</div>
 
-    <!-- 1. DASHBOARD VIEW -->
     <div id="dashboard-view" class="view-section active">
         <div class="metrics-container">
             <div class="card">
@@ -181,9 +289,26 @@
         </div>
         
         <button class="btn-block btn-excel" onclick="downloadExcelWorkbook()">📊 Download Excel Workbook (.xlsx)</button>
+
+        <div class="history-container">
+            <div class="history-header">
+                <div class="history-title" id="history-title-text">Recent Activity</div>
+                <button class="history-toggle" id="history-toggle-btn" onclick="toggleHistoryLength()">View Full List</button>
+            </div>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body">
+                    </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- 2. EXPENSE FORM VIEW -->
     <div id="expense-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -197,8 +322,7 @@
             <div class="form-row">
                 <label>Category</label>
                 <select id="exp-category" onchange="toggleCustom('exp-category', 'exp-custom-cat-row')">
-                    <!-- Loaded dynamically via script -->
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-cat-row">
                 <label>Custom Category</label>
@@ -211,8 +335,7 @@
             <div class="form-row">
                 <label>Payment Method</label>
                 <select id="exp-payment" onchange="toggleCustom('exp-payment', 'exp-custom-pay-row')">
-                    <!-- Loaded dynamically via script -->
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="exp-custom-pay-row">
                 <label>Custom Payment</label>
@@ -226,7 +349,6 @@
         <button class="btn-block" onclick="saveExpense()">Save Expense</button>
     </div>
 
-    <!-- 3. INCOME FORM VIEW -->
     <div id="income-view" class="view-section">
         <div class="form-group">
             <div class="form-row">
@@ -244,8 +366,7 @@
             <div class="form-row">
                 <label>Category</label>
                 <select id="inc-category" onchange="handleIncomeCategoryChange()">
-                    <!-- Loaded dynamically via script -->
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-cat-row">
                 <label>Custom Category</label>
@@ -262,8 +383,7 @@
             <div class="form-row">
                 <label>Type</label>
                 <select id="inc-type" onchange="toggleCustom('inc-type', 'inc-custom-type-row')">
-                    <!-- Loaded dynamically via script -->
-                </select>
+                    </select>
             </div>
             <div class="form-row conditional-field" id="inc-custom-type-row">
                 <label>Custom Type</label>
@@ -281,7 +401,17 @@
         <button class="btn-block" onclick="saveIncome()">Save Income</button>
     </div>
 
-    <!-- TAB NAVIGATION BAR -->
+    <div class="modal-overlay" id="details-modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-tx-type">Transaction Details</div>
+                <button class="modal-close" onclick="closeModal()">Done</button>
+            </div>
+            <div id="modal-details-body">
+                </div>
+        </div>
+    </div>
+
     <div class="tab-bar">
         <button class="tab-item active" onclick="switchView('dashboard', this)">
             <span class="tab-icon">📊</span>
@@ -299,34 +429,29 @@
 
     <script>
         let myChart = null;
+        let viewFullHistory = false; // Tracks table view length state
 
-        // Cleaned Master Baseline Lists
+        // Master lists
         const baseExpenseCategories = ['Automotive', 'Dining Out', 'Entertainment', 'Gas', 'Gardening', 'Gift', 'Groceries', 'Hobby', 'Health & Wellness', 'Home Renovation', 'Household', 'Insurance', 'Mortgage', 'Pets', 'Subscriptions', 'Tools', 'Travel', 'Work'];
         const baseExpensePayments = ['ACH', 'Apple Cash', 'Cash', 'Chase Credit Card', 'Chase Debit Card', 'Check', 'Direct Debit', 'Discover Credit Card', 'PayPal', 'Robinhood Credit Card', 'Robinhood Savings Account ACH', 'Venmo', 'Zelle'];
         
         const baseIncomeCategories = ['Art', 'Art Commission', 'Construction', 'Construction Commissions', 'Education', 'Nursing', 'Product Testing', 'Reimbursement'];
         const baseIncomeTypes = ['Apple Cash', 'Cash', 'Check', 'Direct Deposit', 'Etsy Payout', 'Gusto', 'Venmo', 'Zelle'];
 
-        // Forces date initialization to precisely read Pacific Standard Time / Pacific Daylight Time
         function setDefaultDates() {
             const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
             const formatter = new Intl.DateTimeFormat('en-US', options);
             const [{ value: month }, , { value: day }, , { value: year }] = formatter.formatToParts(new Date());
-            
-            // Reassembles into the HTML-required YYYY-MM-DD input field layout template
             const localFormattedDate = `${year}-${month}-${day}`;
             
             document.getElementById('exp-date').value = localFormattedDate;
             document.getElementById('inc-date').value = localFormattedDate;
         }
 
-        // Helper function to build dynamic dropdown list sorted by usage frequency
         function populateDropdown(elementId, baseList, historicalField, storageKey) {
             const selectEl = document.getElementById(elementId);
             selectEl.innerHTML = ''; 
-
             const data = JSON.parse(localStorage.getItem(storageKey)) || [];
-            
             const frequencies = {};
             baseList.forEach(item => frequencies[item] = 0);
             
@@ -338,22 +463,18 @@
             });
 
             const sortedOptions = [...baseList].sort((a, b) => {
-                if (frequencies[b] !== frequencies[a]) {
-                    return frequencies[b] - frequencies[a];
-                }
+                if (frequencies[b] !== frequencies[a]) return frequencies[b] - frequencies[a];
                 return a.localeCompare(b);
             });
 
             sortedOptions.forEach(opt => {
                 const el = document.createElement('option');
-                el.value = opt;
-                el.textContent = opt;
+                el.value = opt; el.textContent = opt;
                 selectEl.appendChild(el);
             });
 
             const otherEl = document.createElement('option');
-            otherEl.value = 'Other';
-            otherEl.textContent = 'Other';
+            otherEl.value = 'Other'; otherEl.textContent = 'Other';
             selectEl.appendChild(otherEl);
         }
 
@@ -367,7 +488,6 @@
         function handleIncomeCategoryChange() {
             const catSelect = document.getElementById('inc-category').value;
             toggleCustom('inc-category', 'inc-custom-cat-row');
-            
             if (catSelect === 'Reimbursement') {
                 document.getElementById('inc-hours').value = '999';
             }
@@ -384,6 +504,7 @@
             if(viewName === 'dashboard') {
                 calculateMetrics();
                 renderChart();
+                buildHistoryTable();
             } else {
                 populateAllDropdowns();
                 toggleCustom('exp-category', 'exp-custom-cat-row');
@@ -410,8 +531,6 @@
 
         function calculateMetrics() {
             const data = getStorageData();
-            
-            // Metric filters need local time comparison matching
             const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric' };
             const formatter = new Intl.DateTimeFormat('en-US', options);
             const [{ value: currentMonth }, , { value: currentYear }] = formatter.formatToParts(new Date());
@@ -430,6 +549,99 @@
 
             document.getElementById('dash-expenses').innerText = `$${totalExp.toFixed(2)}`;
             document.getElementById('dash-income').innerText = `$${totalInc.toFixed(2)}`;
+        }
+
+        // Unifies historical databases and sorts chronologically descending for layout feeds
+        function buildHistoryTable() {
+            const data = getStorageData();
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            let unifiedList = [];
+
+            data.expenses.forEach((e, index) => {
+                unifiedList.push({ ...e, rawType: 'Expense', storageIndex: index, sortDate: e.date || '' });
+            });
+            data.income.forEach((i, index) => {
+                unifiedList.push({ ...i, rawType: 'Income', storageIndex: index, sortDate: i.date || '' });
+            });
+
+            // Sort by date newest to oldest
+            unifiedList.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+
+            // Apply view length filtering based on full list state
+            const targetDisplayList = viewFullHistory ? unifiedList : unifiedList.slice(0, 10);
+            
+            document.getElementById('history-title-text').innerText = viewFullHistory ? 'All Activity' : 'Recent Activity';
+            document.getElementById('history-toggle-btn').innerText = viewFullHistory ? 'Show Less' : 'View Full List';
+
+            if(targetDisplayList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#8e8e93; padding:20px 0;">No transactions recorded yet.</td></tr>`;
+                return;
+            }
+
+            targetDisplayList.forEach(tx => {
+                const row = document.createElement('tr');
+                row.style.cursor = 'pointer';
+                row.onclick = () => showTransactionDetails(tx);
+
+                const isExpense = tx.rawType === 'Expense';
+                const typeColor = isExpense ? 'var(--accent-red)' : 'var(--accent-green)';
+                const amountPrefix = isExpense ? '-' : '+';
+
+                row.innerHTML = `
+                    <td>${formatDateStr(tx.date)}</td>
+                    <td style="color: ${typeColor}; font-weight:500;">${tx.rawType}</td>
+                    <td class="text-right" style="color: ${typeColor}; font-weight:600;">
+                        ${amountPrefix}$${parseFloat(tx.amount || 0).toFixed(2)}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function toggleHistoryLength() {
+            viewFullHistory = !viewFullHistory;
+            buildHistoryTable();
+        }
+
+        // Modal inspector generator logic parsing item structures by context type
+        function showTransactionDetails(tx) {
+            const modal = document.getElementById('details-modal');
+            const typeHeader = document.getElementById('modal-tx-type');
+            const body = document.getElementById('modal-details-body');
+            
+            typeHeader.innerText = `${tx.rawType} Details`;
+            body.innerHTML = '';
+
+            let detailsHTML = `<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${formatDateStr(tx.date)}</span></div>`;
+
+            if(tx.rawType === 'Expense') {
+                detailsHTML += `
+                    <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${tx.location || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${tx.category || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Item(s)</span><span class="detail-value">${tx.items || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Payment Method</span><span class="detail-value">${tx.paymentMethod || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Total Amount</span><span class="detail-value" style="color:var(--accent-red); font-weight:bold;">$${parseFloat(tx.amount || 0).toFixed(2)}</span></div>
+                `;
+            } else {
+                detailsHTML += `
+                    <div class="detail-row"><span class="detail-label">Hours Worked</span><span class="detail-value">${tx.hours || '0'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Amount Received</span><span class="detail-value" style="color:var(--accent-green); font-weight:bold;">$${parseFloat(tx.amount || 0).toFixed(2)}</span></div>
+                    <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${tx.category || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">From</span><span class="detail-value">${tx.from || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Info / Notes</span><span class="detail-value">${tx.info || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Payment Type</span><span class="detail-value">${tx.type || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Taxes Status</span><span class="detail-value">${tx.taxes || 'N/A'}</span></div>
+                `;
+            }
+
+            body.innerHTML = detailsHTML;
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('details-modal').style.display = 'none';
         }
 
         function renderChart() {
@@ -546,7 +758,7 @@
             document.getElementById('exp-amount').value = '';
             document.getElementById('exp-custom-category').value = '';
             document.getElementById('exp-custom-payment').value = '';
-            setDefaultDates(); // Reset local dates cleanly
+            setDefaultDates(); 
             alert('Expense saved locally!');
         }
 
@@ -575,7 +787,7 @@
             document.getElementById('inc-from').value = '';
             document.getElementById('inc-info').value = '';
             document.getElementById('inc-custom-type').value = '';
-            setDefaultDates(); // Reset local dates cleanly
+            setDefaultDates(); 
             alert('Income saved locally!');
         }
 
@@ -621,6 +833,7 @@
         setDefaultDates();
         calculateMetrics();
         renderChart();
+        buildHistoryTable(); // Initialize baseline layout build lists
     </script>
 </body>
 </html>
