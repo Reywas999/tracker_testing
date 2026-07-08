@@ -124,7 +124,7 @@
             border-bottom: none;
         }
         .history-table tr:active {
-            background-color: #f2f2f7; /* Gives row click feedback */
+            background-color: #f2f2f7; 
         }
         .text-right {
             text-align: right;
@@ -138,7 +138,7 @@
             background-color: rgba(0,0,0,0.4);
             z-index: 1000;
             justify-content: center;
-            align-items: flex-end; /* Slides up like native iOS sheet */
+            align-items: flex-end; 
         }
         .modal-content {
             background-color: var(--card-bg);
@@ -147,7 +147,7 @@
             border-top-right-radius: 16px;
             padding: 20px;
             box-sizing: border-box;
-            max-height: 80vh;
+            max-height: 90vh;
             overflow-y: auto;
             padding-bottom: calc(20px + env(safe-area-inset-bottom));
         }
@@ -173,6 +173,7 @@
         .detail-row {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             padding: 12px 0;
             border-bottom: 1px solid #f2f2f7;
             font-size: 16px;
@@ -187,6 +188,16 @@
             font-weight: 500;
             text-align: right;
             max-width: 60%;
+        }
+        /* Modal Form Inputs */
+        .modal-input {
+            font-size: 16px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            text-align: right;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         /* Form styling matching iOS clean aesthetics */
@@ -404,8 +415,9 @@
     <div class="modal-overlay" id="details-modal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
+                <button class="modal-close" style="color:var(--accent-red);" onclick="closeModal()">Cancel</button>
                 <div class="modal-title" id="modal-tx-type">Transaction Details</div>
-                <button class="modal-close" onclick="closeModal()">Done</button>
+                <button class="modal-close" id="modal-primary-btn" onclick="toggleModalEditMode()">Edit</button>
             </div>
             <div id="modal-details-body">
                 </div>
@@ -429,7 +441,9 @@
 
     <script>
         let myChart = null;
-        let viewFullHistory = false; // Tracks table view length state
+        let viewFullHistory = false; 
+        let currentActiveTx = null; // Caches the currently inspected entry tracking profile
+        let isModalEditing = false; // Tracks editing profile context
 
         // Master lists
         const baseExpenseCategories = ['Automotive', 'Dining Out', 'Entertainment', 'Gas', 'Gardening', 'Gift', 'Groceries', 'Hobby', 'Health & Wellness', 'Home Renovation', 'Household', 'Insurance', 'Mortgage', 'Pets', 'Subscriptions', 'Tools', 'Travel', 'Work'];
@@ -450,6 +464,7 @@
 
         function populateDropdown(elementId, baseList, historicalField, storageKey) {
             const selectEl = document.getElementById(elementId);
+            if(!selectEl) return;
             selectEl.innerHTML = ''; 
             const data = JSON.parse(localStorage.getItem(storageKey)) || [];
             const frequencies = {};
@@ -457,9 +472,7 @@
             
             data.forEach(entry => {
                 const val = entry[historicalField];
-                if (val && frequencies[val] !== undefined) {
-                    frequencies[val]++;
-                }
+                if (val && frequencies[val] !== undefined) frequencies[val]++;
             });
 
             const sortedOptions = [...baseList].sort((a, b) => {
@@ -551,7 +564,6 @@
             document.getElementById('dash-income').innerText = `$${totalInc.toFixed(2)}`;
         }
 
-        // Unifies historical databases and sorts chronologically descending for layout feeds
         function buildHistoryTable() {
             const data = getStorageData();
             const tbody = document.getElementById('history-table-body');
@@ -566,10 +578,8 @@
                 unifiedList.push({ ...i, rawType: 'Income', storageIndex: index, sortDate: i.date || '' });
             });
 
-            // Sort by date newest to oldest
             unifiedList.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
 
-            // Apply view length filtering based on full list state
             const targetDisplayList = viewFullHistory ? unifiedList : unifiedList.slice(0, 10);
             
             document.getElementById('history-title-text').innerText = viewFullHistory ? 'All Activity' : 'Recent Activity';
@@ -605,19 +615,24 @@
             buildHistoryTable();
         }
 
-        // Modal inspector generator logic parsing item structures by context type
+        // Renders Modal in View-Only state
         function showTransactionDetails(tx) {
+            currentActiveTx = tx;
+            isModalEditing = false;
+            
             const modal = document.getElementById('details-modal');
             const typeHeader = document.getElementById('modal-tx-type');
+            const pBtn = document.getElementById('modal-primary-btn');
             const body = document.getElementById('modal-details-body');
             
             typeHeader.innerText = `${tx.rawType} Details`;
+            pBtn.innerText = "Edit";
             body.innerHTML = '';
 
-            let detailsHTML = `<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${formatDateStr(tx.date)}</span></div>`;
+            let html = `<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${formatDateStr(tx.date)}</span></div>`;
 
             if(tx.rawType === 'Expense') {
-                detailsHTML += `
+                html += `
                     <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${tx.location || 'N/A'}</span></div>
                     <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${tx.category || 'N/A'}</span></div>
                     <div class="detail-row"><span class="detail-label">Item(s)</span><span class="detail-value">${tx.items || 'N/A'}</span></div>
@@ -625,7 +640,7 @@
                     <div class="detail-row"><span class="detail-label">Total Amount</span><span class="detail-value" style="color:var(--accent-red); font-weight:bold;">$${parseFloat(tx.amount || 0).toFixed(2)}</span></div>
                 `;
             } else {
-                detailsHTML += `
+                html += `
                     <div class="detail-row"><span class="detail-label">Hours Worked</span><span class="detail-value">${tx.hours || '0'}</span></div>
                     <div class="detail-row"><span class="detail-label">Amount Received</span><span class="detail-value" style="color:var(--accent-green); font-weight:bold;">$${parseFloat(tx.amount || 0).toFixed(2)}</span></div>
                     <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${tx.category || 'N/A'}</span></div>
@@ -636,12 +651,113 @@
                 `;
             }
 
-            body.innerHTML = detailsHTML;
+            body.innerHTML = html;
             modal.style.display = 'flex';
+        }
+
+        // Toggles between inline view mode and form layout edits inside the modal layout
+        function toggleModalEditMode() {
+            if (isModalEditing) {
+                saveModalEdits();
+                return;
+            }
+            
+            isModalEditing = true;
+            const pBtn = document.getElementById('modal-primary-btn');
+            const body = document.getElementById('modal-details-body');
+            pBtn.innerText = "Save";
+
+            const tx = currentActiveTx;
+            let html = `<div class="detail-row"><span class="detail-label">Date</span><input type="date" id="mod-date" class="modal-input" value="${tx.date}"></div>`;
+
+            if(tx.rawType === 'Expense') {
+                html += `
+                    <div class="detail-row"><span class="detail-label">Location</span><input type="text" id="mod-location" class="modal-input" value="${tx.location || ''}"></div>
+                    <div class="detail-row"><span class="detail-label">Category</span>
+                        <select id="mod-category" class="modal-input"></select>
+                    </div>
+                    <div class="detail-row"><span class="detail-label">Item(s)</span><input type="text" id="mod-items" class="modal-input" value="${tx.items || ''}"></div>
+                    <div class="detail-row"><span class="detail-label">Payment Method</span>
+                        <select id="mod-payment" class="modal-input"></select>
+                    </div>
+                    <div class="detail-row"><span class="detail-label">Total Amount</span><input type="number" step="0.01" id="mod-amount" class="modal-input" value="${tx.amount || 0}"></div>
+                `;
+                body.innerHTML = html;
+                populateDropdown('mod-category', baseExpenseCategories, 'category', 'expenses');
+                populateDropdown('mod-payment', baseExpensePayments, 'paymentMethod', 'expenses');
+                document.getElementById('mod-category').value = baseExpenseCategories.includes(tx.category) ? tx.category : 'Other';
+                document.getElementById('mod-payment').value = baseExpensePayments.includes(tx.paymentMethod) ? tx.paymentMethod : 'Other';
+            } else {
+                html += `
+                    <div class="detail-row"><span class="detail-label">Hours Worked</span><input type="number" step="0.1" id="mod-hours" class="modal-input" value="${tx.hours || 0}"></div>
+                    <div class="detail-row"><span class="detail-label">Amount</span><input type="number" step="0.01" id="mod-amount" class="modal-input" value="${tx.amount || 0}"></div>
+                    <div class="detail-row"><span class="detail-label">Category</span>
+                        <select id="mod-category" class="modal-input" onchange="if(this.value==='Reimbursement')document.getElementById('mod-hours').value='999'"></select>
+                    </div>
+                    <div class="detail-row"><span class="detail-label">From</span><input type="text" id="mod-from" class="modal-input" value="${tx.from || ''}"></div>
+                    <div class="detail-row"><span class="detail-label">Info / Notes</span><input type="text" id="mod-info" class="modal-input" value="${tx.info || ''}"></div>
+                    <div class="detail-row"><span class="detail-label">Type</span>
+                        <select id="mod-type" class="modal-input"></select>
+                    </div>
+                    <div class="detail-row"><span class="detail-label">Taxes</span>
+                        <select id="mod-taxes" class="modal-input">
+                            <option value="Pre-tax">Pre-tax</option>
+                            <option value="Post-tax">Post-tax</option>
+                            <option value="Exempt">Exempt</option>
+                        </select>
+                    </div>
+                `;
+                body.innerHTML = html;
+                populateDropdown('mod-category', baseIncomeCategories, 'category', 'income');
+                populateDropdown('mod-type', baseIncomeTypes, 'type', 'income');
+                document.getElementById('mod-category').value = baseIncomeCategories.includes(tx.category) ? tx.category : 'Other';
+                document.getElementById('mod-type').value = baseIncomeTypes.includes(tx.type) ? tx.type : 'Other';
+                document.getElementById('mod-taxes').value = tx.taxes || 'Pre-tax';
+            }
+        }
+
+        // Commits inline modal input form state changes back into LocalStorage
+        function saveModalEdits() {
+            const tx = currentActiveTx;
+            const storageKey = tx.rawType === 'Expense' ? 'expenses' : 'income';
+            const dataList = JSON.parse(localStorage.getItem(storageKey)) || [];
+
+            if(tx.rawType === 'Expense') {
+                dataList[tx.storageIndex] = {
+                    date: document.getElementById('mod-date').value,
+                    location: document.getElementById('mod-location').value,
+                    category: document.getElementById('mod-category').value,
+                    items: document.getElementById('mod-items').value,
+                    paymentMethod: document.getElementById('mod-payment').value,
+                    amount: parseFloat(document.getElementById('mod-amount').value) || 0.0
+                };
+            } else {
+                dataList[tx.storageIndex] = {
+                    date: document.getElementById('mod-date').value,
+                    hours: parseFloat(document.getElementById('mod-hours').value) || 0,
+                    amount: parseFloat(document.getElementById('mod-amount').value) || 0.0,
+                    category: document.getElementById('mod-category').value,
+                    from: document.getElementById('mod-from').value,
+                    info: document.getElementById('mod-info').value,
+                    type: document.getElementById('mod-type').value,
+                    taxes: document.getElementById('mod-taxes').value
+                };
+            }
+
+            localStorage.setItem(storageKey, JSON.stringify(dataList));
+            
+            // Re-render and recalculate core background metric layouts immediately
+            calculateMetrics();
+            renderChart();
+            buildHistoryTable();
+            closeModal();
+            alert('Changes saved successfully!');
         }
 
         function closeModal() {
             document.getElementById('details-modal').style.display = 'none';
+            isModalEditing = false;
+            currentActiveTx = null;
         }
 
         function renderChart() {
@@ -682,9 +798,7 @@
                 netValues.push(inc - exp);
             });
 
-            if (myChart) {
-                myChart.destroy();
-            }
+            if (myChart) myChart.destroy();
 
             const ctx = document.getElementById('financialChart').getContext('2d');
             myChart = new Chart(ctx, {
@@ -692,46 +806,15 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            label: 'Income',
-                            data: incomeValues,
-                            borderColor: '#34c759',
-                            backgroundColor: '#34c75922',
-                            tension: 0.2,
-                            borderWidth: 3
-                        },
-                        {
-                            label: 'Expenses',
-                            data: expenseValues,
-                            borderColor: '#ff3b30',
-                            backgroundColor: '#ff3b3022',
-                            tension: 0.2,
-                            borderWidth: 3
-                        },
-                        {
-                            label: 'Net Income',
-                            data: netValues,
-                            borderColor: '#007aff',
-                            backgroundColor: 'transparent',
-                            borderDash: [5, 5],
-                            tension: 0.2,
-                            borderWidth: 2
-                        }
+                        { label: 'Income', data: incomeValues, borderColor: '#34c759', backgroundColor: '#34c75922', tension: 0.2, borderWidth: 3 },
+                        { label: 'Expenses', data: expenseValues, borderColor: '#ff3b30', backgroundColor: '#ff3b3022', tension: 0.2, borderWidth: 3 },
+                        { label: 'Net Income', data: netValues, borderColor: '#007aff', backgroundColor: 'transparent', borderDash: [5, 5], tension: 0.2, borderWidth: 2 }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: { position: 'top' }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) { return '$' + value; }
-                            }
-                        }
-                    }
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return '$' + value; } } } }
                 }
             });
         }
@@ -833,7 +916,7 @@
         setDefaultDates();
         calculateMetrics();
         renderChart();
-        buildHistoryTable(); // Initialize baseline layout build lists
+        buildHistoryTable();
     </script>
 </body>
 </html>
