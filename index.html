@@ -189,7 +189,6 @@
             text-align: right;
             max-width: 60%;
         }
-        /* Modal Form Inputs */
         .modal-input {
             font-size: 16px;
             padding: 4px;
@@ -442,8 +441,8 @@
     <script>
         let myChart = null;
         let viewFullHistory = false; 
-        let currentActiveTx = null; // Caches the currently inspected entry tracking profile
-        let isModalEditing = false; // Tracks editing profile context
+        let currentActiveTx = null; 
+        let isModalEditing = false; 
 
         // Master lists
         const baseExpenseCategories = ['Automotive', 'Dining Out', 'Entertainment', 'Gas', 'Gardening', 'Gift', 'Groceries', 'Hobby', 'Health & Wellness', 'Home Renovation', 'Household', 'Insurance', 'Mortgage', 'Pets', 'Subscriptions', 'Tools', 'Travel', 'Work'];
@@ -452,12 +451,15 @@
         const baseIncomeCategories = ['Art', 'Art Commission', 'Construction', 'Construction Commissions', 'Education', 'Nursing', 'Product Testing', 'Reimbursement'];
         const baseIncomeTypes = ['Apple Cash', 'Cash', 'Check', 'Direct Deposit', 'Etsy Payout', 'Gusto', 'Venmo', 'Zelle'];
 
-        function setDefaultDates() {
+        function getCaliforniaTodayString() {
             const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
             const formatter = new Intl.DateTimeFormat('en-US', options);
             const [{ value: month }, , { value: day }, , { value: year }] = formatter.formatToParts(new Date());
-            const localFormattedDate = `${year}-${month}-${day}`;
-            
+            return `${year}-${month}-${day}`;
+        }
+
+        function setDefaultDates() {
+            const localFormattedDate = getCaliforniaTodayString();
             document.getElementById('exp-date').value = localFormattedDate;
             document.getElementById('inc-date').value = localFormattedDate;
         }
@@ -615,7 +617,6 @@
             buildHistoryTable();
         }
 
-        // Renders Modal in View-Only state
         function showTransactionDetails(tx) {
             currentActiveTx = tx;
             isModalEditing = false;
@@ -655,7 +656,6 @@
             modal.style.display = 'flex';
         }
 
-        // Toggles between inline view mode and form layout edits inside the modal layout
         function toggleModalEditMode() {
             if (isModalEditing) {
                 saveModalEdits();
@@ -673,13 +673,9 @@
             if(tx.rawType === 'Expense') {
                 html += `
                     <div class="detail-row"><span class="detail-label">Location</span><input type="text" id="mod-location" class="modal-input" value="${tx.location || ''}"></div>
-                    <div class="detail-row"><span class="detail-label">Category</span>
-                        <select id="mod-category" class="modal-input"></select>
-                    </div>
+                    <div class="detail-row"><span class="detail-label">Category</span><select id="mod-category" class="modal-input"></select></div>
                     <div class="detail-row"><span class="detail-label">Item(s)</span><input type="text" id="mod-items" class="modal-input" value="${tx.items || ''}"></div>
-                    <div class="detail-row"><span class="detail-label">Payment Method</span>
-                        <select id="mod-payment" class="modal-input"></select>
-                    </div>
+                    <div class="detail-row"><span class="detail-label">Payment Method</span><select id="mod-payment" class="modal-input"></select></div>
                     <div class="detail-row"><span class="detail-label">Total Amount</span><input type="number" step="0.01" id="mod-amount" class="modal-input" value="${tx.amount || 0}"></div>
                 `;
                 body.innerHTML = html;
@@ -691,14 +687,10 @@
                 html += `
                     <div class="detail-row"><span class="detail-label">Hours Worked</span><input type="number" step="0.1" id="mod-hours" class="modal-input" value="${tx.hours || 0}"></div>
                     <div class="detail-row"><span class="detail-label">Amount</span><input type="number" step="0.01" id="mod-amount" class="modal-input" value="${tx.amount || 0}"></div>
-                    <div class="detail-row"><span class="detail-label">Category</span>
-                        <select id="mod-category" class="modal-input" onchange="if(this.value==='Reimbursement')document.getElementById('mod-hours').value='999'"></select>
-                    </div>
+                    <div class="detail-row"><span class="detail-label">Category</span><select id="mod-category" class="modal-input" onchange="if(this.value==='Reimbursement')document.getElementById('mod-hours').value='999'"></select></div>
                     <div class="detail-row"><span class="detail-label">From</span><input type="text" id="mod-from" class="modal-input" value="${tx.from || ''}"></div>
                     <div class="detail-row"><span class="detail-label">Info / Notes</span><input type="text" id="mod-info" class="modal-input" value="${tx.info || ''}"></div>
-                    <div class="detail-row"><span class="detail-label">Type</span>
-                        <select id="mod-type" class="modal-input"></select>
-                    </div>
+                    <div class="detail-row"><span class="detail-label">Type</span><select id="mod-type" class="modal-input"></select></div>
                     <div class="detail-row"><span class="detail-label">Taxes</span>
                         <select id="mod-taxes" class="modal-input">
                             <option value="Pre-tax">Pre-tax</option>
@@ -716,7 +708,6 @@
             }
         }
 
-        // Commits inline modal input form state changes back into LocalStorage
         function saveModalEdits() {
             const tx = currentActiveTx;
             const storageKey = tx.rawType === 'Expense' ? 'expenses' : 'income';
@@ -745,8 +736,6 @@
             }
 
             localStorage.setItem(storageKey, JSON.stringify(dataList));
-            
-            // Re-render and recalculate core background metric layouts immediately
             calculateMetrics();
             renderChart();
             buildHistoryTable();
@@ -760,42 +749,69 @@
             currentActiveTx = null;
         }
 
+        // Generates a continuous dynamic daily cumulative timeline layout framework
         function renderChart() {
             const data = getStorageData();
-            const monthlyData = {};
+            
+            // Collect all dates to evaluate the earliest start day
+            let allDates = [];
+            data.expenses.forEach(e => { if(e.date) allDates.push(e.date); });
+            data.income.forEach(i => { if(i.date) allDates.push(i.date); });
 
-            data.expenses.forEach(e => {
-                if(!e.date) return;
-                const key = e.date.substring(0, 7); 
-                if(!monthlyData[key]) monthlyData[key] = { income: 0, expenses: 0 };
-                monthlyData[key].expenses += parseFloat(e.amount || 0);
-            });
+            // Default fallback if there are no entries yet
+            const todayStr = getCaliforniaTodayString();
+            let startDateStr = todayStr;
 
-            data.income.forEach(i => {
-                if(!i.date) return;
-                const key = i.date.substring(0, 7);
-                if(!monthlyData[key]) monthlyData[key] = { income: 0, expenses: 0 };
-                monthlyData[key].income += parseFloat(i.amount || 0);
-            });
+            if (allDates.length > 0) {
+                allDates.sort();
+                startDateStr = allDates[0]; // Earliest transaction
+            }
 
-            const sortedKeys = Object.keys(monthlyData).sort();
+            // Convert string markers into manageable native date objects
+            const startDate = new Date(startDateStr + 'T00:00:00');
+            const endDate = new Date(todayStr + 'T00:00:00');
+
+            // Generate every single consecutive calendar day in the sequence timeline
             const labels = [];
+            const dayKeys = []; // Keeps track of YYYY-MM-DD loops safely
+            let currentLoopDate = new Date(startDate);
+
+            while (currentLoopDate <= endDate) {
+                const year = currentLoopDate.getFullYear();
+                const month = String(currentLoopDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentLoopDate.getDate()).padStart(2, '0');
+                const key = `${year}-${month}-${day}`;
+                
+                dayKeys.push(key);
+                // Formatting for the chart labels: MM/DD/YYYY
+                labels.push(`${month}/${day}/${year}`);
+                
+                currentLoopDate.setDate(currentLoopDate.getDate() + 1);
+            }
+
+            // Tally up specific daily transaction amounts
+            const dailyExpenses = {};
+            const dailyIncome = {};
+            dayKeys.forEach(key => { dailyExpenses[key] = 0; dailyIncome[key] = 0; });
+
+            data.expenses.forEach(e => { if(e.date && dailyExpenses[e.date] !== undefined) dailyExpenses[e.date] += parseFloat(e.amount || 0); });
+            data.income.forEach(i => { if(i.date && dailyIncome[i.date] !== undefined) dailyIncome[i.date] += parseFloat(i.amount || 0); });
+
+            // Compile cumulative line variables sequentially across the generated grid
             const incomeValues = [];
             const expenseValues = [];
             const netValues = [];
-            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-            sortedKeys.forEach(key => {
-                const parts = key.split('-');
-                const year = parts[0];
-                const monthIdx = parseInt(parts[1], 10) - 1;
-                labels.push(`${monthNames[monthIdx]} ${year}`);
+            let totalRunningIncome = 0;
+            let totalRunningExpenses = 0;
 
-                const inc = monthlyData[key].income;
-                const exp = monthlyData[key].expenses;
-                incomeValues.push(inc);
-                expenseValues.push(exp);
-                netValues.push(inc - exp);
+            dayKeys.forEach(key => {
+                totalRunningIncome += dailyIncome[key];
+                totalRunningExpenses += dailyExpenses[key];
+
+                incomeValues.push(totalRunningIncome);
+                expenseValues.push(totalRunningExpenses);
+                netValues.push(totalRunningIncome - totalRunningExpenses);
             });
 
             if (myChart) myChart.destroy();
@@ -806,15 +822,21 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Income', data: incomeValues, borderColor: '#34c759', backgroundColor: '#34c75922', tension: 0.2, borderWidth: 3 },
-                        { label: 'Expenses', data: expenseValues, borderColor: '#ff3b30', backgroundColor: '#ff3b3022', tension: 0.2, borderWidth: 3 },
-                        { label: 'Net Income', data: netValues, borderColor: '#007aff', backgroundColor: 'transparent', borderDash: [5, 5], tension: 0.2, borderWidth: 2 }
+                        { label: 'Income', data: incomeValues, borderColor: '#34c759', backgroundColor: '#34c75911', tension: 0.1, borderWidth: 2.5, pointRadius: labels.length > 30 ? 0 : 3 },
+                        { label: 'Expenses', data: expenseValues, borderColor: '#ff3b30', backgroundColor: '#ff3b3011', tension: 0.1, borderWidth: 2.5, pointRadius: labels.length > 30 ? 0 : 3 },
+                        { label: 'Net Income', data: netValues, borderColor: '#007aff', backgroundColor: 'transparent', borderDash: [4, 4], tension: 0.1, borderWidth: 2, pointRadius: labels.length > 30 ? 0 : 3 }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { position: 'top' } },
-                    scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return '$' + value; } } } }
+                    plugins: { 
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: { 
+                        y: { beginAtZero: true, ticks: { callback: function(value) { return '$' + value; } } },
+                        x: { ticks: { maxTicksLimit: 6 } } // Automatically spaces labels as data scales out
+                    }
                 }
             });
         }
